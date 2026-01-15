@@ -1,0 +1,14 @@
+# 忽略全部
+*
+
+# 允許目標檔案
+!app.py
+!requirements.txt
+!Dockerfile
+
+# 允許 templates 資料夾與其內容
+!templates/
+!templates/**
+
+# 允許 .gitignore 本身
+!.gitignore
