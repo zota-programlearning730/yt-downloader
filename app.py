@@ -53,6 +53,7 @@ def download_video():
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         }
+        'cookiefile': 'cookies.txt',  # 加入這行，讀取同一層目錄下的 cookies.txt
     }
     # ============================================
 
@@ -63,29 +64,52 @@ def download_video():
     #     })
     # ... (前面的 ydl_options 保持不變) ...
 
+    # # === 修改這一段：增強歌詞下載邏輯 ===
+    # if get_lyrics:
+    #     ydl_options.update({
+    #         # 1. 下載創作者手動上傳的字幕
+    #         'writesubtitles': True,
+            
+    #         # 2. 關鍵！如果沒有手動字幕，就下載 YouTube 自動產生的字幕
+    #         'writeautomaticsub': True,
+            
+    #         # 3. 抓取更多語言變體
+    #         # 'en.*' 代表所有英文 (en-US, en-UK...)
+    #         # 'zh.*' 代表所有中文 (zh-TW, zh-Hant, zh-CN...)
+    #         # 'ja' 加入日文，因為很多動漫歌需要
+    #         'subtitleslangs': ['en.*', 'zh.*', 'ja'],
+            
+    #         # 4. 將字幕轉檔為最通用的 .srt 格式 (原本可能是 vtt)
+    #         'postprocessors': [{
+    #             # 這是原本的音訊轉換
+    #             'key': 'FFmpegExtractAudio',
+    #             'preferredcodec': 'mp3',
+    #             'preferredquality': '192',
+    #         }, {
+    #             # 這是新增的：字幕轉換
+    #             'key': 'FFmpegSubtitlesConvertor',
+    #             'format': 'srt',
+    #         }],
+    #     })
+    # ==================================
+
     # === 修改這一段：增強歌詞下載邏輯 ===
+    # 在 app.py 找到這一段並修改
     if get_lyrics:
         ydl_options.update({
-            # 1. 下載創作者手動上傳的字幕
             'writesubtitles': True,
-            
-            # 2. 關鍵！如果沒有手動字幕，就下載 YouTube 自動產生的字幕
             'writeautomaticsub': True,
             
-            # 3. 抓取更多語言變體
-            # 'en.*' 代表所有英文 (en-US, en-UK...)
-            # 'zh.*' 代表所有中文 (zh-TW, zh-Hant, zh-CN...)
-            # 'ja' 加入日文，因為很多動漫歌需要
-            'subtitleslangs': ['en.*', 'zh.*', 'ja'],
-            
-            # 4. 將字幕轉檔為最通用的 .srt 格式 (原本可能是 vtt)
+            # === 修改這裡：移除 .*，精確指定語言 ===
+            # 這樣只會下載這三種，不會重複抓一堆變體
+            'subtitleslangs': ['en', 'zh-Hant', 'ja'], 
+            # ====================================
+
             'postprocessors': [{
-                # 這是原本的音訊轉換
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }, {
-                # 這是新增的：字幕轉換
                 'key': 'FFmpegSubtitlesConvertor',
                 'format': 'srt',
             }],
