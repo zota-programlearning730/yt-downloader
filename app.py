@@ -56,11 +56,41 @@ def download_video():
     }
     # ============================================
 
+    # if get_lyrics:
+    #     ydl_options.update({
+    #         'writesubtitles': True,
+    #         'subtitleslangs': ['en', 'zh-Hant'],
+    #     })
+    # ... (前面的 ydl_options 保持不變) ...
+
+    # === 修改這一段：增強歌詞下載邏輯 ===
     if get_lyrics:
         ydl_options.update({
+            # 1. 下載創作者手動上傳的字幕
             'writesubtitles': True,
-            'subtitleslangs': ['en', 'zh-Hant'],
+            
+            # 2. 關鍵！如果沒有手動字幕，就下載 YouTube 自動產生的字幕
+            'writeautomaticsub': True,
+            
+            # 3. 抓取更多語言變體
+            # 'en.*' 代表所有英文 (en-US, en-UK...)
+            # 'zh.*' 代表所有中文 (zh-TW, zh-Hant, zh-CN...)
+            # 'ja' 加入日文，因為很多動漫歌需要
+            'subtitleslangs': ['en.*', 'zh.*', 'ja'],
+            
+            # 4. 將字幕轉檔為最通用的 .srt 格式 (原本可能是 vtt)
+            'postprocessors': [{
+                # 這是原本的音訊轉換
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }, {
+                # 這是新增的：字幕轉換
+                'key': 'FFmpegSubtitlesConvertor',
+                'format': 'srt',
+            }],
         })
+    # ==================================
 
     try:
         with yt_dlp.YoutubeDL(ydl_options) as ydl:
