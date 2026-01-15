@@ -1,24 +1,22 @@
-# 使用官方 Python 基礎映像檔
 FROM python:3.9-slim
 
-# 安裝 FFmpeg (這是關鍵！)
+# 安裝 FFmpeg (下載轉 MP3 必須)
 RUN apt-get update && \
     apt-get install -y ffmpeg && \
     apt-get clean
 
-# 設定工作目錄
 WORKDIR /app
 
-# 複製 requirements.txt 並安裝套件
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 複製所有程式碼
 COPY . .
 
-# 建立暫存資料夾 (確保權限正確)
 RUN mkdir -p temp_downloads
 
-# 設定啟動指令
-# 使用 gunicorn 啟動 app:app (檔名:變數名)
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:10000", "app:app", "--timeout", "300"]
+# 設定環境變數 PORT，預設 10000
+ENV PORT=10000
+
+# 這裡使用 gunicorn 啟動，比 python app.py 更穩定
+# 注意：它會自動讀取上面的 PORT 變數
+CMD gunicorn -w 2 -b 0.0.0.0:$PORT app:app --timeout 300
