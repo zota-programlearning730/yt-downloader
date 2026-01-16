@@ -50,7 +50,7 @@ def download_video():
         'ignoreerrors': True,
         'noplaylist': False,
 
-        # 'cookiefile': 'cookies.txt',  # 加入這行，讀取同一層目錄下的 cookies.txt
+        'cookiefile': 'cookies.txt',  # 加入這行，讀取同一層目錄下的 cookies.txt
         # 偽裝成 Windows 電腦上的 Chrome 瀏覽器
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
