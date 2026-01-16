@@ -5,6 +5,7 @@
 !app.py
 !requirements.txt
 !Dockerfile
+!cookies.txt
 
 # 允許 templates 資料夾與其內容
 !templates/
