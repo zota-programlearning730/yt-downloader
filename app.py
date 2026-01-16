@@ -49,11 +49,12 @@ def download_video():
         'outtmpl': f'{task_folder}/%(title)s.%(ext)s',
         'ignoreerrors': True,
         'noplaylist': False,
+
+        # 'cookiefile': 'cookies.txt',  # 加入這行，讀取同一層目錄下的 cookies.txt
         # 偽裝成 Windows 電腦上的 Chrome 瀏覽器
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        },
-        'cookiefile': 'cookies.txt',  # 加入這行，讀取同一層目錄下的 cookies.txt
+        }
     }
     # ============================================
 
@@ -95,16 +96,46 @@ def download_video():
 
     # === 修改這一段：增強歌詞下載邏輯 ===
     # 在 app.py 找到這一段並修改
+    # if get_lyrics:
+    #     ydl_options.update({
+    #         'writesubtitles': True,
+    #         'writeautomaticsub': True,
+            
+    #         # === 修改這裡：移除 .*，精確指定語言 ===
+    #         # 這樣只會下載這三種，不會重複抓一堆變體
+    #         'subtitleslangs': ['en', 'zh-Hant', 'ja'], 
+    #         # ====================================
+
+    #         'postprocessors': [{
+    #             'key': 'FFmpegExtractAudio',
+    #             'preferredcodec': 'mp3',
+    #             'preferredquality': '192',
+    #         }, {
+    #             'key': 'FFmpegSubtitlesConvertor',
+    #             'format': 'srt',
+    #         }],
+    #     })
+    # ==================================
+
+        # ==================================
+
+    # === 修改這一段：增強歌詞下載邏輯 ===
     if get_lyrics:
         ydl_options.update({
+            # 1. 只下載創作者「手動上傳」的字幕 (品質保證)
             'writesubtitles': True,
-            'writeautomaticsub': True,
             
-            # === 修改這裡：移除 .*，精確指定語言 ===
-            # 這樣只會下載這三種，不會重複抓一堆變體
-            'subtitleslangs': ['en', 'zh-Hant', 'ja'], 
-            # ====================================
-
+            # 2. 【關鍵修改】關閉自動產生
+            # 因為自動產生的歌詞通常不準 (你提到的問題 3)，而且會導致產生多餘的翻譯檔案
+            'writeautomaticsub': False, 
+            
+            # 3. 【關鍵修改】改成 'all' 或 Regex
+            # '-.*' 的意思是排除所有自動產生的標籤 (雖然上面已經關了，但雙重保險)
+            # 這裡設為 'all'，意思是：只要是創作者上傳的，我都要。
+            # 通常 MV 只會有一份原語言的手動字幕，這樣你就不會抓到一堆奇怪的翻譯。
+            'subtitleslangs': ['all', '-live_chat'],
+            
+            # 4. 轉檔設定維持不變
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
