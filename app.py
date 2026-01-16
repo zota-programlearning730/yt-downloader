@@ -4,6 +4,7 @@ import os
 import shutil
 import zipfile
 import uuid
+import syncedlyrics  # 新增：外部歌詞套件
 
 app = Flask(__name__)
 
@@ -26,143 +27,112 @@ def index():
 @app.route('/download', methods=['POST'])
 def download_video():
     data = request.json
-    url = data.get('url')
-    get_lyrics = data.get('lyrics')
+    raw_urls = data.get('urls', '')  # 接收多行字串
+    format_type = data.get('format', 'mp3') # 'mp3' or 'mp4'
+    get_lyrics = data.get('lyrics', False)
 
-    if not url:
-        return jsonify({'status': 'error', 'message': '請輸入網址'}), 400
+    # 處理多網址：依換行符號切割，並去除空白
+    url_list = [u.strip() for u in raw_urls.split('\n') if u.strip()]
+
+    if not url_list:
+        return jsonify({'status': 'error', 'message': '請至少輸入一個網址'}), 400
 
     task_id = str(uuid.uuid4())
     task_folder = os.path.join(BASE_TEMP_FOLDER, task_id)
     os.makedirs(task_folder)
 
-    print(f"開始任務: {task_id}, URL: {url}")
+    print(f"開始任務: {task_id}, 網址數量: {len(url_list)}")
 
-    # === 關鍵修改：加入 User-Agent 偽裝，防止被擋 ===
+    # === 設定 yt-dlp 參數 ===
+# ... (前面的程式碼) ...
+
+    # === 設定 yt-dlp 參數 ===
     ydl_options = {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
         'outtmpl': f'{task_folder}/%(title)s.%(ext)s',
         'ignoreerrors': True,
         'noplaylist': False,
-
-        'cookiefile': 'cookies.txt',  # 加入這行，讀取同一層目錄下的 cookies.txt
-        # 偽裝成 Windows 電腦上的 Chrome 瀏覽器
+        
+        # 1. 嘗試移除 cookies.txt 看看 (如果 cookies 失效會導致下載失敗)
+        # 如果你確定 cookies 是新鮮且有效的，可以留著，不然建議先註解掉測試
+        # 'cookiefile': 'cookies.txt', 
+        
+        # 2. 關鍵：模擬真實瀏覽器 User-Agent
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        }
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        
+        # 3. 避免下載容易失敗的 HLS 分段串流 (你的 log 裡失敗的就是這種)
+        # 告訴它優先選 "非 dash" 且 "非 hls" 的格式，這通常會比較穩定
+        # 但如果是 MP3 下載，通常 bestaudio 就夠了，這邊主要針對影片
     }
-    # ============================================
 
-    # if get_lyrics:
-    #     ydl_options.update({
-    #         'writesubtitles': True,
-    #         'subtitleslangs': ['en', 'zh-Hant'],
-    #     })
-    # ... (前面的 ydl_options 保持不變) ...
-
-    # # === 修改這一段：增強歌詞下載邏輯 ===
-    # if get_lyrics:
-    #     ydl_options.update({
-    #         # 1. 下載創作者手動上傳的字幕
-    #         'writesubtitles': True,
-            
-    #         # 2. 關鍵！如果沒有手動字幕，就下載 YouTube 自動產生的字幕
-    #         'writeautomaticsub': True,
-            
-    #         # 3. 抓取更多語言變體
-    #         # 'en.*' 代表所有英文 (en-US, en-UK...)
-    #         # 'zh.*' 代表所有中文 (zh-TW, zh-Hant, zh-CN...)
-    #         # 'ja' 加入日文，因為很多動漫歌需要
-    #         'subtitleslangs': ['en.*', 'zh.*', 'ja'],
-            
-    #         # 4. 將字幕轉檔為最通用的 .srt 格式 (原本可能是 vtt)
-    #         'postprocessors': [{
-    #             # 這是原本的音訊轉換
-    #             'key': 'FFmpegExtractAudio',
-    #             'preferredcodec': 'mp3',
-    #             'preferredquality': '192',
-    #         }, {
-    #             # 這是新增的：字幕轉換
-    #             'key': 'FFmpegSubtitlesConvertor',
-    #             'format': 'srt',
-    #         }],
-    #     })
-    # ==================================
-
-    # === 修改這一段：增強歌詞下載邏輯 ===
-    # 在 app.py 找到這一段並修改
-    # if get_lyrics:
-    #     ydl_options.update({
-    #         'writesubtitles': True,
-    #         'writeautomaticsub': True,
-            
-    #         # === 修改這裡：移除 .*，精確指定語言 ===
-    #         # 這樣只會下載這三種，不會重複抓一堆變體
-    #         'subtitleslangs': ['en', 'zh-Hant', 'ja'], 
-    #         # ====================================
-
-    #         'postprocessors': [{
-    #             'key': 'FFmpegExtractAudio',
-    #             'preferredcodec': 'mp3',
-    #             'preferredquality': '192',
-    #         }, {
-    #             'key': 'FFmpegSubtitlesConvertor',
-    #             'format': 'srt',
-    #         }],
-    #     })
-    # ==================================
-
-        # ==================================
-
-    # === 修改這一段：增強歌詞下載邏輯 ===
-    if get_lyrics:
+    if format_type == 'mp3':
         ydl_options.update({
-            # 1. 只下載創作者「手動上傳」的字幕 (品質保證)
-            'writesubtitles': True,
-            
-            # 2. 【關鍵修改】關閉自動產生
-            # 因為自動產生的歌詞通常不準 (你提到的問題 3)，而且會導致產生多餘的翻譯檔案
-            'writeautomaticsub': False, 
-            
-            # 3. 【關鍵修改】改成 'all' 或 Regex
-            # '-.*' 的意思是排除所有自動產生的標籤 (雖然上面已經關了，但雙重保險)
-            # 這裡設為 'all'，意思是：只要是創作者上傳的，我都要。
-            # 通常 MV 只會有一份原語言的手動字幕，這樣你就不會抓到一堆奇怪的翻譯。
-            'subtitleslangs': ['all', '-live_chat'],
-            
-            # 4. 轉檔設定維持不變
+            'format': 'bestaudio/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
-            }, {
-                'key': 'FFmpegSubtitlesConvertor',
-                'format': 'srt',
             }],
         })
-    # ==================================
+    else: # mp4
+        ydl_options.update({
+            # 嘗試修改格式選擇邏輯：優先選有影片+聲音的單檔，選不到才合併
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'merge_output_format': 'mp4',
+        })
+
+    # ... (後面的程式碼) ...
 
     try:
+        downloaded_titles = []
+        
+        # 迴圈處理每個網址
         with yt_dlp.YoutubeDL(ydl_options) as ydl:
-            ydl.download([url])
+            for url in url_list:
+                try:
+                    # 1. 下載影片/音樂
+                    info = ydl.extract_info(url, download=True)
+                    
+                    # 獲取影片標題供歌詞搜尋使用
+                    # 如果是播放清單，info 會是 entries，這裡簡化處理，只針對單影片優化歌詞
+                    if 'entries' not in info:
+                        title = info.get('title', '')
+                        downloaded_titles.append(title)
+                        
+                        # 2. 歌詞下載 (使用 syncedlyrics)
+                        if get_lyrics and title:
+                            print(f"正在搜尋歌詞: {title}")
+                            try:
+                                # 搜尋並儲存 .lrc 檔案
+                                lrc_content = syncedlyrics.search(title)
+                                if lrc_content:
+                                    lrc_filename = os.path.join(task_folder, f"{title}.lrc")
+                                    with open(lrc_filename, "w", encoding="utf-8") as f:
+                                        f.write(lrc_content)
+                            except Exception as e:
+                                print(f"歌詞下載失敗 ({title}): {e}")
 
-        downloaded_files = os.listdir(task_folder)
-        if not downloaded_files:
-            # 嘗試捕捉更詳細的錯誤
-            return jsonify({'status': 'error', 'message': '下載失敗：可能是 YouTube 封鎖了伺服器 IP，或影片有版權限制。'}), 500
+                except Exception as e:
+                    print(f"單一網址下載錯誤: {e}")
+                    continue
 
-        # 處理檔案回傳邏輯
-        mp3_files = [f for f in downloaded_files if f.endswith('.mp3')]
-        if len(downloaded_files) == 1 and downloaded_files[0].endswith('.mp3'):
-            final_file_path = os.path.join(task_folder, downloaded_files[0])
-            download_name = downloaded_files[0]
+        # 檢查資料夾內是否有檔案
+        files = os.listdir(task_folder)
+        if not files:
+            return jsonify({'status': 'error', 'message': '下載失敗，可能是 YouTube 封鎖了伺服器 IP，或 Cookies 失效。'}), 500
+
+        # 打包邏輯：如果只有一個檔案且不是 zip，直接回傳；否則打包
+        # 注意：如果有歌詞檔(.lrc) + 音樂檔(.mp3)，也應該打包，方便使用者一次下載
+        media_files = [f for f in files if f.endswith('.mp3') or f.endswith('.mp4')]
+        
+        # 如果只有一個媒體檔案，且沒有歌詞檔案，才直接傳檔案
+        if len(files) == 1 and (files[0].endswith('.mp3') or files[0].endswith('.mp4')):
+            final_file_path = os.path.join(task_folder, files[0])
+            download_name = files[0]
         else:
-            zip_filename = f"music_download_{task_id[:8]}.zip"
+            # 多個檔案 (多首歌 或 一首歌+歌詞)，全部打包
+            zip_filename = f"yt_downloads_{task_id[:8]}.zip"
             zip_path = os.path.join(BASE_TEMP_FOLDER, zip_filename)
             zip_files(task_folder, zip_path)
             final_file_path = zip_path
@@ -202,8 +172,5 @@ def get_file(task_id, filename):
     return send_file(file_path, as_attachment=True, download_name=filename)
 
 if __name__ == '__main__':
-    # === 關鍵修改：解決 Render Port 錯誤 ===
-    # 自動抓取環境變數 PORT，如果沒有就用 10000 (Render 預設)
     port = int(os.environ.get("PORT", 10000))
-    # 綁定 0.0.0.0 讓外部可以連線
     app.run(debug=True, host='0.0.0.0', port=port)

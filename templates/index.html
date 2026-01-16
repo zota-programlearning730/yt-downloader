@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YT 下載器 (Python + JS)</title>
+    <title>YT 進階下載器</title>
     <style>
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -13,36 +13,44 @@
             background-color: #f4f4f9;
             color: #333;
         }
-        h1 {
-            text-align: center;
-            color: #2c3e50;
-        }
+        h1 { text-align: center; color: #2c3e50; }
         .container {
             background: white;
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .input-group { 
-            margin-bottom: 20px; 
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-        input[type="text"] { 
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        textarea { 
             width: 100%; 
+            height: 120px;
             padding: 12px; 
             box-sizing: border-box; 
             border: 2px solid #ddd;
             border-radius: 5px;
-            font-size: 16px;
+            font-size: 14px;
+            resize: vertical;
         }
-        input[type="text"]:focus {
-            border-color: #3498db;
-            outline: none;
+        textarea:focus { border-color: #3498db; outline: none; }
+        
+        /* 選項樣式 */
+        .options-row {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
         }
+        .radio-group label {
+            display: inline-block;
+            margin-right: 15px;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
         button { 
             width: 100%;
             padding: 15px; 
@@ -55,13 +63,8 @@
             font-weight: bold;
             transition: background 0.3s;
         }
-        button:hover {
-            background-color: #2980b9;
-        }
-        button:disabled { 
-            background-color: #95a5a6; 
-            cursor: not-allowed;
-        }
+        button:hover { background-color: #2980b9; }
+        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
         #status { 
             margin-top: 20px; 
             white-space: pre-wrap; 
@@ -76,77 +79,82 @@
 <body>
 
     <div class="container">
-        <h1>YouTube 音樂下載器</h1>
+        <h1>YouTube 批次下載器</h1>
         
         <div class="input-group">
-            <label for="urlInput">影片或播放清單網址：</label>
-            <input type="text" id="urlInput" placeholder="請貼上 https://www.youtube.com/...">
+            <label for="urlInput">影片網址 (一行一個，支援多個)：</label>
+            <textarea id="urlInput" placeholder="https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/watch?v=..."></textarea>
         </div>
 
-        <div class="input-group">
-            <label style="font-weight: normal; cursor: pointer;">
-                <input type="checkbox" id="lyricsCheckbox"> 同時下載歌詞 (如有提供)
-            </label>
+        <div class="options-row">
+            <div>
+                <label>下載格式：</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="format" value="mp3" checked> MP3 音樂</label>
+                    <label><input type="radio" name="format" value="mp4"> MP4 影片</label>
+                </div>
+            </div>
+            
+            <div style="border-left: 2px solid #ddd; padding-left: 20px;">
+                <label style="font-weight: normal; cursor: pointer;">
+                    <input type="checkbox" id="lyricsCheckbox"> 自動搜尋動態歌詞 (.lrc)
+                </label>
+            </div>
         </div>
 
-        <button id="downloadBtn" onclick="startDownload()">開始下載</button>
+        <button id="downloadBtn" onclick="startDownload()">開始批次下載</button>
         
         <div id="status">準備就緒...</div>
     </div>
 
     <script>
         async function startDownload() {
-            const url = document.getElementById('urlInput').value;
+            const urls = document.getElementById('urlInput').value;
             const lyrics = document.getElementById('lyricsCheckbox').checked;
+            const format = document.querySelector('input[name="format"]:checked').value;
             const statusDiv = document.getElementById('status');
             const btn = document.getElementById('downloadBtn');
 
-            // 簡單的網址檢查
-            if (!url) {
-                alert('請輸入網址！');
+            if (!urls.trim()) {
+                alert('請至少輸入一個網址！');
                 return;
             }
 
-            // 鎖定按鈕，避免重複點擊
             btn.disabled = true;
             btn.innerText = "伺服器處理中...";
-            statusDiv.innerText = "正在伺服器端下載與轉檔...\n(如果是播放清單，可能需要幾分鐘，請耐心等候)";
-            statusDiv.style.color = "#d35400"; // 橘色文字表示處理中
+            statusDiv.innerText = "正在處理中，若網址較多請稍候...\n(搜尋歌詞需要額外時間)";
+            statusDiv.style.color = "#d35400";
 
             try {
-                // 1. 發送請求給 Python 後端
                 const response = await fetch('/download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: url, lyrics: lyrics })
+                    body: JSON.stringify({ 
+                        urls: urls, 
+                        lyrics: lyrics,
+                        format: format
+                    })
                 });
 
                 const data = await response.json();
 
-                // 2. 判斷後端回應
                 if (data.status === 'success') {
-                    statusDiv.innerText = "✅ 處理完成！瀏覽器將開始下載檔案...";
-                    statusDiv.style.color = "#27ae60"; // 綠色
-                    
-                    // 3. 這是最關鍵的一步：讓瀏覽器跳轉到下載連結
-                    // 這會觸發 Python 的 /get-file 路由，瀏覽器就會跳出存檔視窗
+                    statusDiv.innerText = "✅ 處理完成！正在下載...";
+                    statusDiv.style.color = "#27ae60";
                     window.location.href = data.download_url;
                     
-                    // 下載啟動後，恢復按鈕文字
                     setTimeout(() => {
-                        btn.innerText = "下載完成，再來一首？";
+                        btn.innerText = "下載完成，繼續使用？";
                         btn.disabled = false;
                     }, 2000);
 
                 } else {
-                    // 後端回傳錯誤 (例如網址無效)
                     statusDiv.innerText = "❌ 錯誤: " + data.message;
-                    statusDiv.style.color = "#c0392b"; // 紅色
+                    statusDiv.style.color = "#c0392b";
                     btn.disabled = false;
                     btn.innerText = "開始下載";
                 }
             } catch (error) {
-                // 網路連線錯誤或其他例外
                 statusDiv.innerText = "❌ 系統錯誤: " + error;
                 statusDiv.style.color = "#c0392b";
                 btn.disabled = false;
